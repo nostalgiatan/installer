@@ -24,7 +24,19 @@ pub struct Args {
     #[arg(short, long)]
     pub debug: bool,
     
-    /// 执行的命令: install, uninstall, repair
+    /// 执行的命令: install, uninstall, repair, update
     #[arg(default_value = "install")]
     pub command: String,
+    
+    /// 仅检查更新，不执行更新
+    #[arg(long)]
+    pub check: bool,
+    
+    /// 指定备份目录
+    #[arg(long)]
+    pub backup_dir: Option<String>,
+    
+    /// 强制更新，忽略版本检查
+    #[arg(long)]
+    pub force: bool,
 }

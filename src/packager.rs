@@ -12,16 +12,16 @@
 // 注意事项: 使用zstd算法进行高效压缩
 
 use anyhow::Result;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::fs::{File, create_dir_all};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use walkdir::WalkDir;
 use zstd::stream::{Encoder, Decoder};
 
 /// 打包目录为zstd压缩文件
 pub fn pack_directory(source_dir: &Path, output_file: &Path) -> Result<()> {
-    info!("Packaging directory {:?} to {:?} using zstd", source_dir, output_file);
+    info!("Packaging directory {source_dir:?} to {output_file:?} using zstd");
     
     // 创建输出文件
     let output = File::create(output_file)?;
@@ -56,20 +56,20 @@ pub fn pack_directory(source_dir: &Path, output_file: &Path) -> Result<()> {
             encoder.write_all(&buffer)?;
             
             file_count += 1;
-            debug!("Added file: {:?}", relative_path);
+            debug!("Added file: {relative_path:?}");
         }
     }
     
     // 完成编码
     encoder.finish()?;
     
-    info!("Successfully packaged {} files to {:?}", file_count, output_file);
+    info!("Successfully packaged {file_count} files to {output_file:?}");
     Ok(())
 }
 
 /// 从zstd压缩文件解压到目录
 pub fn unpack_directory(input_file: &Path, output_dir: &Path) -> Result<()> {
-    info!("Unpacking {:?} to {:?} using zstd", input_file, output_dir);
+    info!("Unpacking {input_file:?} to {output_dir:?} using zstd");
     
     // 创建输出目录
     create_dir_all(output_dir)?;
@@ -117,16 +117,16 @@ pub fn unpack_directory(input_file: &Path, output_dir: &Path) -> Result<()> {
         output_file.write_all(&file_content)?;
         
         file_count += 1;
-        debug!("Extracted file: {:?}", file_path);
+        debug!("Extracted file: {file_path:?}");
     }
     
-    info!("Successfully unpacked {} files to {:?}", file_count, output_dir);
+    info!("Successfully unpacked {file_count} files to {output_dir:?}");
     Ok(())
 }
 
 /// 压缩单个文件为zstd格式
 pub fn compress_file(input_file: &Path, output_file: &Path) -> Result<()> {
-    info!("Compressing file {:?} to {:?} using zstd", input_file, output_file);
+    info!("Compressing file {input_file:?} to {output_file:?} using zstd");
     
     // 打开输入文件
     let mut input = File::open(input_file)?;
@@ -145,13 +145,13 @@ pub fn compress_file(input_file: &Path, output_file: &Path) -> Result<()> {
     // 完成编码
     encoder.finish()?;
     
-    info!("Successfully compressed file {:?} to {:?}", input_file, output_file);
+    info!("Successfully compressed file {input_file:?} to {output_file:?}");
     Ok(())
 }
 
 /// 解压单个zstd文件
 pub fn decompress_file(input_file: &Path, output_file: &Path) -> Result<()> {
-    info!("Decompressing file {:?} to {:?} using zstd", input_file, output_file);
+    info!("Decompressing file {input_file:?} to {output_file:?} using zstd");
     
     // 打开输入文件
     let input = File::open(input_file)?;
@@ -167,6 +167,6 @@ pub fn decompress_file(input_file: &Path, output_file: &Path) -> Result<()> {
     decoder.read_to_end(&mut buffer)?;
     output.write_all(&buffer)?;
     
-    info!("Successfully decompressed file {:?} to {:?}", input_file, output_file);
+    info!("Successfully decompressed file {input_file:?} to {output_file:?}");
     Ok(())
 }

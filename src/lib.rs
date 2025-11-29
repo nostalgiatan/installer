@@ -12,6 +12,7 @@ pub mod installer;
 pub mod packager;
 pub mod platform;
 pub mod utils;
+pub mod version;
 
 // 重新导出主要类型和函数
 pub use cli::Args;
@@ -19,3 +20,4 @@ pub use config::{Config, InstallOptions, load_config, generate_default_config};
 pub use installer::Installer;
 pub use packager::{pack_directory, unpack_directory, compress_file, decompress_file};
 pub use platform::PlatformImpl;
+pub use version::{Version, get_current_version, save_version, check_update};

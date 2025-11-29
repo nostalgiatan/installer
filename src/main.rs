@@ -21,6 +21,7 @@ mod cli;
 mod installer;
 mod platform;
 mod utils;
+mod version;
 
 use crate::cli::Args;
 
@@ -46,6 +47,7 @@ fn main() -> Result<()> {
         "install" => installer.install()?,
         "uninstall" => installer.uninstall()?,
         "repair" => installer.repair()?,
+        "update" => installer.update()?,
         _ => anyhow::bail!("Unknown command: {}", args.command),
     }
     

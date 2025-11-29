@@ -22,13 +22,13 @@ use fs_extra::dir::CopyOptions;
 
 /// 创建目录，如果目录已存在则忽略
 pub fn create_directory(path: &Path) -> Result<()> {
-    debug!("Creating directory: {:?}", path);
+    debug!("Creating directory: {path:?}");
     
     if !path.exists() {
         fs::create_dir_all(path)?;
-        debug!("Directory created: {:?}", path);
+        debug!("Directory created: {path:?}");
     } else {
-        debug!("Directory already exists: {:?}", path);
+        debug!("Directory already exists: {path:?}");
     }
     
     Ok(())
@@ -36,10 +36,10 @@ pub fn create_directory(path: &Path) -> Result<()> {
 
 /// 复制文件和目录
 pub fn copy_files(source: &Path, destination: &Path) -> Result<()> {
-    debug!("Copying files from {:?} to {:?}", source, destination);
+    debug!("Copying files from {source:?} to {destination:?}");
     
     if !source.exists() {
-        anyhow::bail!("Source path does not exist: {:?}", source);
+        anyhow::bail!("Source path does not exist: {source:?}");
     }
     
     // 创建目标目录
@@ -61,9 +61,9 @@ pub fn copy_files(source: &Path, destination: &Path) -> Result<()> {
 
 /// 执行命令
 pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> {
-    debug!("Executing command: {}", command);
+    debug!("Executing command: {command}");
     if let Some(dir) = working_dir {
-        debug!("Working directory: {:?}", dir);
+        debug!("Working directory: {dir:?}");
     }
     
     // 在Windows上使用cmd.exe执行命令，在Unix上使用sh执行命令
@@ -74,7 +74,7 @@ pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> 
     };
     
     let mut cmd = Command::new(shell);
-    cmd.args(&shell_args);
+    cmd.args(shell_args);
     
     // 设置工作目录
     if let Some(dir) = working_dir {
@@ -89,8 +89,8 @@ pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> 
     let status = cmd.status()?;
     
     if !status.success() {
-        error!("Command failed with status: {:?}", status);
-        anyhow::bail!("Command execution failed: {}", command);
+        error!("Command failed with status: {status:?}");
+        anyhow::bail!("Command execution failed: {command}");
     }
     
     debug!("Command executed successfully");
@@ -111,13 +111,13 @@ pub fn file_exists(path: &Path) -> bool {
 
 /// 删除文件
 pub fn delete_file(path: &Path) -> Result<()> {
-    debug!("Deleting file: {:?}", path);
+    debug!("Deleting file: {path:?}");
     
     if path.exists() {
         fs::remove_file(path)?;
-        debug!("File deleted: {:?}", path);
+        debug!("File deleted: {path:?}");
     } else {
-        debug!("File does not exist: {:?}", path);
+        debug!("File does not exist: {path:?}");
     }
     
     Ok(())
@@ -125,13 +125,13 @@ pub fn delete_file(path: &Path) -> Result<()> {
 
 /// 删除目录
 pub fn delete_directory(path: &Path) -> Result<()> {
-    debug!("Deleting directory: {:?}", path);
+    debug!("Deleting directory: {path:?}");
     
     if path.exists() {
         fs::remove_dir_all(path)?;
-        debug!("Directory deleted: {:?}", path);
+        debug!("Directory deleted: {path:?}");
     } else {
-        debug!("Directory does not exist: {:?}", path);
+        debug!("Directory does not exist: {path:?}");
     }
     
     Ok(())
@@ -153,7 +153,7 @@ pub fn list_files(path: &Path) -> Result<Vec<PathBuf>> {
 
 /// 替换文件中的字符串
 pub fn replace_in_file(path: &Path, from: &str, to: &str) -> Result<()> {
-    debug!("Replacing '{}' with '{}' in file: {:?}", from, to, path);
+    debug!("Replacing '{from}' with '{to}' in file: {path:?}");
     
     let content = fs::read_to_string(path)?;
     let new_content = content.replace(from, to);

@@ -1,7 +1,7 @@
 // SeeSea Installer - Config Module Tests
 // 测试配置管理模块的功能
 
-use seesea_installer::config::{self, Config, InstallOptions};
+use seesea_installer::config;
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;
@@ -13,7 +13,7 @@ fn test_load_config() {
     let config_path = temp_dir.path().join("installer.toml");
     
     // 创建测试配置文件
-    let config_content = r#"
+        let config_content = r#"
 [project]
 name = "test-project"
 version = "1.0.0"
@@ -26,6 +26,12 @@ create_desktop_shortcut = true
 create_start_menu_shortcut = true
 add_to_path = true
 create_uninstaller = true
+silent = false
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 [[commands]]
 name = "test-command"
@@ -33,6 +39,7 @@ program = "/bin/echo"
 args = ["hello", "world"]
 working_dir = "/tmp"
 background = false
+ignore_errors = false
 "#;
     
     let mut file = File::create(&config_path).unwrap();
@@ -77,10 +84,15 @@ create_desktop_shortcut = true
 create_start_menu_shortcut = true
 add_to_path = true
 create_uninstaller = true
+silent = false
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 [commands]
 "#;
-    
     let mut file = File::create(&config_path).unwrap();
     file.write_all(config_content.as_bytes()).unwrap();
     
@@ -127,6 +139,12 @@ create_desktop_shortcut = false
 create_start_menu_shortcut = false
 add_to_path = false
 create_uninstaller = false
+silent = false
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 [platform.windows]
 default_dir = "C:\\Program Files\\Test"
@@ -134,6 +152,12 @@ create_desktop_shortcut = true
 create_start_menu_shortcut = true
 add_to_path = true
 create_uninstaller = true
+silent = true
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 [platform.linux]
 default_dir = "/usr/local/test"
@@ -141,6 +165,12 @@ create_desktop_shortcut = true
 create_start_menu_shortcut = true
 add_to_path = true
 create_uninstaller = true
+silent = true
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 [platform.macos]
 default_dir = "/Applications/Test"
@@ -148,6 +178,12 @@ create_desktop_shortcut = true
 create_start_menu_shortcut = true
 add_to_path = true
 create_uninstaller = true
+silent = true
+create_service = false
+auto_check_updates = true
+update_channel = "stable"
+backup_enabled = true
+backup_retention = 5
 
 # 空的commands数组
 [[commands]]
@@ -155,6 +191,7 @@ name = "placeholder"
 program = "/bin/true"
 args = []
 background = false
+ignore_errors = false
 "#;
     
     let mut file = File::create(&config_path).unwrap();
