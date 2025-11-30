@@ -231,7 +231,7 @@ pub fn load_config(config_path: &str) -> Result<Config> {
         }
     }
     
-    let mut file = file.ok_or_else(|| anyhow::anyhow!("Could not find config file at any of the tried paths: {:?}", paths_to_try))?;
+    let mut file = file.ok_or_else(|| anyhow::anyhow!("Could not find config file at any of the tried paths: {paths_to_try:?}"))?;
     
     debug!("Found config file at: {used_path}");
     
@@ -343,6 +343,7 @@ fn validate_config(config: &Config) -> Result<()> {
 }
 
 /// 生成默认配置
+#[allow(dead_code)]
 pub fn generate_default_config() -> Config {
     Config {
         project: ProjectConfig {

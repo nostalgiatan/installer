@@ -107,17 +107,20 @@ pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> 
 }
 
 /// 获取文件大小
+#[allow(dead_code)]
 pub fn get_file_size(path: &Path) -> Result<u64> {
     let metadata = fs::metadata(path)?;
     Ok(metadata.len())
 }
 
 /// 检查文件是否存在
+#[allow(dead_code)]
 pub fn file_exists(path: &Path) -> bool {
     path.exists()
 }
 
 /// 删除文件
+#[allow(dead_code)]
 pub fn delete_file(path: &Path) -> Result<()> {
     debug!("Deleting file: {path:?}");
     
@@ -132,6 +135,7 @@ pub fn delete_file(path: &Path) -> Result<()> {
 }
 
 /// 删除目录
+#[allow(dead_code)]
 pub fn delete_directory(path: &Path) -> Result<()> {
     debug!("Deleting directory: {path:?}");
     
@@ -146,6 +150,7 @@ pub fn delete_directory(path: &Path) -> Result<()> {
 }
 
 /// 列出目录中的所有文件
+#[allow(dead_code)]
 pub fn list_files(path: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     
@@ -160,6 +165,7 @@ pub fn list_files(path: &Path) -> Result<Vec<PathBuf>> {
 }
 
 /// 替换文件中的字符串
+#[allow(dead_code)]
 pub fn replace_in_file(path: &Path, from: &str, to: &str) -> Result<()> {
     debug!("Replacing '{from}' with '{to}' in file: {path:?}");
     

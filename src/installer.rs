@@ -26,6 +26,7 @@ use std::collections::HashMap;
 
 /// 组件状态
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ComponentStatus {
     /// 已安装
     Installed,
@@ -59,7 +60,8 @@ pub struct Installer {
     pub installed_files: Vec<PathBuf>,
     /// 已安装的组件列表，用于回滚
     pub installed_components: Vec<String>,
-    /// 已创建的快捷方式列表，用于回滚
+    /// 已创建的快捷方式列表
+    #[allow(dead_code)]
     pub created_shortcuts: Vec<PathBuf>,
     /// 是否已创建卸载程序，用于回滚
     pub created_uninstaller: bool,
@@ -626,7 +628,7 @@ impl Installer {
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .status();
-        println!("命令执行状态: {:?}", status);
+        println!("命令执行状态: {status:?}");
         
         // 卸载seesea-core包，忽略错误
         info!("Uninstalling seesea-core package");
@@ -636,7 +638,7 @@ impl Installer {
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .status();
-        println!("命令执行状态: {:?}", status);
+        println!("命令执行状态: {status:?}");
         
         // 5. 删除安装目录
         info!("Removing install directory: {install_dir:?}", install_dir = self.install_dir);

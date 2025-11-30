@@ -15,8 +15,9 @@
 
 use crate::config::{Config, InstallOptions};
 use anyhow::Result;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::env;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 /// Linux平台实现结构体
@@ -74,7 +75,7 @@ impl super::Platform for LinuxImpl {
     }
     
     /// 检查系统要求
-    fn check_system_requirements(&self, config: &Config) -> Result<()> {
+    fn check_system_requirements(&self, _config: &Config) -> Result<()> {
         info!("Checking Linux system requirements");
         // 简单实现，仅打印信息
         info!("System requirements check passed");
@@ -99,27 +100,20 @@ impl super::Platform for LinuxImpl {
         
         // 创建.desktop文件内容
         let desktop_content = format!(
-            "[Desktop Entry]\n"
-            "Name={}\n"
-            "Comment={}\n"
-            "Exec={}\n"
-            "Icon={}\n"
-            "Terminal=false\n"
-            "Type=Application\n"
-            "Categories=Utility;Application;\n"
-            "StartupNotify=true\n",
+            "[Desktop Entry]\nName={}\nComment={}\nExec={}\nIcon={}\nTerminal=false\nType=Application\nCategories=Utility;Application;\nStartupNotify=true\n",
             config.project.name,
             config.project.description.as_deref().unwrap_or(""),
             target_exe.display(),
-            // 使用默认图标，实际项目中可以替换为自定义图标路径
             "application-default-icon"
         );
         
         // 写入.desktop文件
         std::fs::write(&shortcut_path, desktop_content)?;
         
-        // 设置可执行权限
-        std::fs::set_permissions(&shortcut_path, std::fs::Permissions::from_mode(0o755))?;
+        // 设置快捷方式权限
+        let mut permissions = std::fs::metadata(&shortcut_path)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&shortcut_path, permissions)?
         
         debug!("Desktop shortcut created successfully");
         
@@ -149,27 +143,20 @@ impl super::Platform for LinuxImpl {
         
         // 创建.desktop文件内容
         let desktop_content = format!(
-            "[Desktop Entry]\n"
-            "Name={}\n"
-            "Comment={}\n"
-            "Exec={}\n"
-            "Icon={}\n"
-            "Terminal=false\n"
-            "Type=Application\n"
-            "Categories=Utility;Application;\n"
-            "StartupNotify=true\n",
+            "[Desktop Entry]\nName={}\nComment={}\nExec={}\nIcon={}\nTerminal=false\nType=Application\nCategories=Utility;Application;\nStartupNotify=true\n",
             config.project.name,
             config.project.description.as_deref().unwrap_or(""),
             target_exe.display(),
-            // 使用默认图标，实际项目中可以替换为自定义图标路径
             "application-default-icon"
         );
         
         // 写入.desktop文件
         std::fs::write(&shortcut_path, desktop_content)?;
         
-        // 设置可执行权限
-        std::fs::set_permissions(&shortcut_path, std::fs::Permissions::from_mode(0o644))?;
+        // 设置快捷方式权限
+        let mut permissions = std::fs::metadata(&shortcut_path)?.permissions();
+        permissions.set_mode(0o644);
+        std::fs::set_permissions(&shortcut_path, permissions)?
         
         debug!("Start menu shortcut created successfully");
         
@@ -278,15 +265,7 @@ impl super::Platform for LinuxImpl {
         
         // 卸载脚本内容
         let uninstall_script = format!(
-            "#!/bin/bash\n"
-            "# SeeSea Uninstaller\n"
-            "\n"
-            "echo \"Uninstalling {}-{}...\"\n"
-            "\n"
-            "# 调用安装程序的卸载命令\n"
-            "\"{}\" uninstall\n"
-            "\n"
-            "echo \"Uninstallation completed successfully!\"\n",
+            "#!/bin/bash\n# SeeSea Uninstaller\n\necho \"Uninstalling {}-{}...\"\n\n# 调用安装程序的卸载命令\n\"{}\" uninstall\n\necho \"Uninstallation completed successfully!\"\n",
             config.project.name,
             config.project.version,
             current_exe.display()
@@ -296,7 +275,9 @@ impl super::Platform for LinuxImpl {
         std::fs::write(&self.uninstall_script_path, uninstall_script)?;
         
         // 设置可执行权限
-        std::fs::set_permissions(&self.uninstall_script_path, std::fs::Permissions::from_mode(0o755))?;
+        let mut permissions = std::fs::metadata(&self.uninstall_script_path)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&self.uninstall_script_path, permissions)?;
         
         info!("Uninstaller created successfully at: {}", self.uninstall_script_path);
         
@@ -337,7 +318,7 @@ impl super::Platform for LinuxImpl {
     }
     
     /// 删除卸载程序
-    fn remove_uninstaller(&self, config: &Config) -> Result<()> {
+    fn remove_uninstaller(&self, _config: &Config) -> Result<()> {
         info!("Removing uninstaller on Linux");
         
         // 删除卸载脚本

@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     
     // 简单测试模式：如果配置文件不存在，只显示控制台窗口
     if let Err(e) = config::load_config(&args.config) {
-        println!("警告: 无法加载配置文件: {}", e);
+        println!("警告: 无法加载配置文件: {e}");
         println!("进入测试模式，仅显示控制台窗口...");
         
         // 等待用户输入，防止命令行窗口立即关闭
@@ -97,8 +97,8 @@ fn main() -> Result<()> {
             info!("SeeSea Installer completed successfully");
         },
         Err(e) => {
-            error!("SeeSea Installer failed with error: {}", e);
-            println!("\n错误: {}", e);
+            error!("SeeSea Installer failed with error: {e}");
+            println!("\n错误: {e}");
         }
     }
     
