@@ -46,6 +46,14 @@ description = "SeeSea Self-Contained Installer"
 version = "1.0.0"
 authors = ["SeeSea Team"]
 resources = ["../building", "../install.toml"]
+icons = ["../static/image/img.png"]
+
+[package.metadata.packager.windows]
+
+[package.metadata.packager.macos]
+
+[package.metadata.packager.linux]
+
 
 
 
