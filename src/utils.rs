@@ -61,6 +61,12 @@ pub fn copy_files(source: &Path, destination: &Path) -> Result<()> {
 
 /// 执行命令
 pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> {
+    // 打印友好的命令执行信息
+    println!("\x1b[1;34m→\x1b[0m Executing: {command}");
+    if let Some(dir) = working_dir {
+        println!("\x1b[1;34m  Directory:\x1b[0m {}", dir.display());
+    }
+    
     debug!("Executing command: {command}");
     if let Some(dir) = working_dir {
         debug!("Working directory: {dir:?}");
@@ -89,10 +95,12 @@ pub fn execute_command(command: &str, working_dir: Option<&Path>) -> Result<()> 
     let status = cmd.status()?;
     
     if !status.success() {
+        println!("\x1b[1;31m✗\x1b[0m Command failed with status: {status}");
         error!("Command failed with status: {status:?}");
         anyhow::bail!("Command execution failed: {command}");
     }
     
+    println!("\x1b[1;32m✓\x1b[0m Command executed successfully");
     debug!("Command executed successfully");
     
     Ok(())

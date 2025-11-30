@@ -58,16 +58,19 @@ impl super::Platform for MacOSImpl {
     fn get_install_options(&self, config: &Config) -> Result<InstallOptions> {
         debug!("Getting macOS specific install options");
         
-        // 如果配置中有macOS特定选项，则使用它，否则使用全局选项
+        // 先获取全局安装选项
+        let mut install_options = config.install_options.clone();
+        
+        // 如果配置中有macOS特定选项，则用它们覆盖全局选项
         if let Some(platform_config) = &config.platform {
-            if let Some(macos_config) = &platform_config.macos {
-                debug!("Using macOS specific install options from config");
-                return Ok(macos_config.clone());
+            if let Some(default_dir) = &platform_config.macos_default_dir {
+                debug!("Using macOS specific default_dir: {default_dir}");
+                install_options.default_dir = default_dir.clone();
             }
         }
         
-        debug!("Using global install options");
-        Ok(config.install_options.clone())
+        debug!("Using merged install options");
+        Ok(install_options)
     }
     
     /// 检查系统要求
@@ -226,6 +229,9 @@ impl super::Platform for MacOSImpl {
     fn create_uninstaller(&self, config: &Config, install_dir: &Path) -> Result<()> {
         info!("Creating uninstaller on macOS");
         
+        // 获取当前安装程序路径
+        let current_exe = env::current_exe()?;
+        
         // 卸载脚本内容
         let uninstall_script = format!(
             "#!/bin/bash\n"
@@ -233,26 +239,13 @@ impl super::Platform for MacOSImpl {
             "\n"
             "echo \"Uninstalling {}-{}...\"\n"
             "\n"
-            "# 删除安装目录\n"
-            "rm -rf {}\n"
-            "\n"
-            "# 删除桌面快捷方式\n"
-            "rm -f \$HOME/Desktop/{}.app\n"
-            "\n"
-            "# 删除应用程序目录快捷方式\n"
-            "rm -f /Applications/{}.app\n"
-            "rm -f \$HOME/Applications/{}.app\n"
-            "\n"
-            "# 删除卸载脚本\n"
-            "rm -f \$0\n"
+            "# 调用安装程序的卸载命令\n"
+            "\"{}\" uninstall\n"
             "\n"
             "echo \"Uninstallation completed successfully!\"\n",
             config.project.name,
             config.project.version,
-            install_dir.display(),
-            config.project.name,
-            config.project.name,
-            config.project.name
+            current_exe.display()
         );
         
         // 写入卸载脚本

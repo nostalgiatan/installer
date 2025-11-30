@@ -142,18 +142,18 @@ pub struct DependencyConfig {
 /// 平台特定配置
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PlatformConfig {
-    /// Windows平台配置
-    pub windows: Option<InstallOptions>,
-    /// Linux平台配置
-    pub linux: Option<InstallOptions>,
-    /// macOS平台配置
-    pub macos: Option<InstallOptions>,
-    /// FreeBSD平台配置
-    pub freebsd: Option<InstallOptions>,
-    /// NetBSD平台配置
-    pub netbsd: Option<InstallOptions>,
-    /// OpenBSD平台配置
-    pub openbsd: Option<InstallOptions>,
+    /// Windows平台默认安装目录
+    pub windows_default_dir: Option<String>,
+    /// Linux平台默认安装目录
+    pub linux_default_dir: Option<String>,
+    /// macOS平台默认安装目录
+    pub macos_default_dir: Option<String>,
+    /// FreeBSD平台默认安装目录
+    pub freebsd_default_dir: Option<String>,
+    /// NetBSD平台默认安装目录
+    pub netbsd_default_dir: Option<String>,
+    /// OpenBSD平台默认安装目录
+    pub openbsd_default_dir: Option<String>,
 }
 
 /// 组件配置
@@ -213,8 +213,27 @@ pub struct Config {
 pub fn load_config(config_path: &str) -> Result<Config> {
     debug!("Loading config from: {config_path}");
     
-    // 打开配置文件
-    let mut file = File::open(config_path)?;
+    // 尝试多种路径查找配置文件
+    let mut paths_to_try = Vec::new();
+    paths_to_try.push(config_path.to_string());
+    paths_to_try.push(format!("../{config_path}"));
+    paths_to_try.push(format!("../../{config_path}"));
+    
+    let mut file = None;
+    let mut used_path = String::new();
+    
+    for path in &paths_to_try {
+        debug!("Trying config path: {path}");
+        if let Ok(f) = File::open(path) {
+            file = Some(f);
+            used_path = path.clone();
+            break;
+        }
+    }
+    
+    let mut file = file.ok_or_else(|| anyhow::anyhow!("Could not find config file at any of the tried paths: {:?}", paths_to_try))?;
+    
+    debug!("Found config file at: {used_path}");
     
     // 读取文件内容
     let mut contents = String::new();

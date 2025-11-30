@@ -143,6 +143,63 @@ pub fn save_version(install_dir: &Path, version: &Version) -> Result<()> {
     Ok(())
 }
 
+/// 从GitHub获取最新版本信息
+pub fn get_latest_version_from_github() -> Result<Version> {
+    debug!("Fetching latest version from GitHub");
+    
+    // 定义GitHub API URL和代理URL
+    let github_api_url = "https://api.github.com/repos/nostalgiatan/SeeSea/releases/latest";
+    let proxy_api_url = "https://gh-proxy.org/https://api.github.com/repos/nostalgiatan/SeeSea/releases/latest";
+    
+    // 创建带有5秒超时的HTTP客户端
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .user_agent("SeeSea-Installer")
+        .build()?;
+    
+    // 尝试从GitHub获取最新版本
+    let release_data = match fetch_release_data(&client, github_api_url) {
+        Ok(data) => data,
+        Err(e) => {
+            debug!("Failed to fetch from GitHub directly: {e:?}, trying proxy URL");
+            // 如果失败，使用代理URL重试
+            fetch_release_data(&client, proxy_api_url)?
+        }
+    };
+    
+    // 提取tag_name
+    let tag_name = release_data.get("tag_name")
+        .ok_or_else(|| anyhow::anyhow!("tag_name not found in GitHub response"))?
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("tag_name is not a string"))?;
+    
+    // 移除可能的前缀，如"v"
+    let version_str = tag_name.strip_prefix("v").unwrap_or(tag_name);
+    
+    debug!("Latest version from GitHub: {version_str}");
+    
+    // 解析版本号
+    Version::parse(version_str)
+}
+
+/// 从指定URL获取发布数据
+fn fetch_release_data(client: &reqwest::blocking::Client, url: &str) -> Result<serde_json::Value> {
+    debug!("Fetching release data from: {url}");
+    
+    // 发送GET请求
+    let response = client.get(url).send()?;
+    
+    // 检查响应状态
+    if !response.status().is_success() {
+        anyhow::bail!("Failed to fetch release data from {url}: {}", response.status());
+    }
+    
+    // 解析JSON响应
+    let release_data: serde_json::Value = response.json()?;
+    
+    Ok(release_data)
+}
+
 /// 检查版本是否需要更新
 pub fn check_update(current_version: Option<Version>, new_version: &Version, force: bool) -> bool {
     if force {

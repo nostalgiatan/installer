@@ -1,0 +1,15 @@
+name = "SeeSea Installer"
+description = "SeeSea Self-Contained Installer"
+version = "1.0.0"
+authors = ["SeeSea Team"]
+
+[[binaries]]
+path = "target/release/seesea-installer.exe"
+
+[[resources]]
+path = "../building"
+target = "building"
+
+[[resources]]
+path = "../install.toml"
+target = "install.toml"

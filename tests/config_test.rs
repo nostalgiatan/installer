@@ -146,44 +146,10 @@ update_channel = "stable"
 backup_enabled = true
 backup_retention = 5
 
-[platform.windows]
-default_dir = "C:\\Program Files\\Test"
-create_desktop_shortcut = true
-create_start_menu_shortcut = true
-add_to_path = true
-create_uninstaller = true
-silent = true
-create_service = false
-auto_check_updates = true
-update_channel = "stable"
-backup_enabled = true
-backup_retention = 5
-
-[platform.linux]
-default_dir = "/usr/local/test"
-create_desktop_shortcut = true
-create_start_menu_shortcut = true
-add_to_path = true
-create_uninstaller = true
-silent = true
-create_service = false
-auto_check_updates = true
-update_channel = "stable"
-backup_enabled = true
-backup_retention = 5
-
-[platform.macos]
-default_dir = "/Applications/Test"
-create_desktop_shortcut = true
-create_start_menu_shortcut = true
-add_to_path = true
-create_uninstaller = true
-silent = true
-create_service = false
-auto_check_updates = true
-update_channel = "stable"
-backup_enabled = true
-backup_retention = 5
+[platform]
+windows_default_dir = "C:\\Program Files\\Test"
+linux_default_dir = "/usr/local/test"
+macos_default_dir = "/Applications/Test"
 
 # 空的commands数组
 [[commands]]
@@ -210,20 +176,11 @@ ignore_errors = false
     let platform_config = config.platform.unwrap();
     
     // 验证Windows配置
-    assert!(platform_config.windows.is_some());
-    let windows_config = platform_config.windows.unwrap();
-    assert_eq!(windows_config.default_dir, "C:\\Program Files\\Test");
-    assert!(windows_config.create_desktop_shortcut);
+    assert_eq!(platform_config.windows_default_dir.unwrap(), "C:\\Program Files\\Test");
     
     // 验证Linux配置
-    assert!(platform_config.linux.is_some());
-    let linux_config = platform_config.linux.unwrap();
-    assert_eq!(linux_config.default_dir, "/usr/local/test");
-    assert!(linux_config.create_desktop_shortcut);
+    assert_eq!(platform_config.linux_default_dir.unwrap(), "/usr/local/test");
     
     // 验证macOS配置
-    assert!(platform_config.macos.is_some());
-    let macos_config = platform_config.macos.unwrap();
-    assert_eq!(macos_config.default_dir, "/Applications/Test");
-    assert!(macos_config.create_desktop_shortcut);
+    assert_eq!(platform_config.macos_default_dir.unwrap(), "/Applications/Test");
 }

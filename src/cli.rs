@@ -13,7 +13,7 @@ use clap::Parser;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// 安装配置文件路径
-    #[arg(short, long, default_value = "installer.toml")]
+    #[arg(short, long, default_value = "install.toml")]
     pub config: String,
     
     /// 安装目录

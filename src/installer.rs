@@ -15,7 +15,7 @@
 use crate::config::{Config, InstallOptions, ComponentConfig};
 use crate::platform::PlatformImpl;
 use crate::utils::{create_directory, execute_command, copy_files};
-use crate::version::{Version, get_current_version, save_version, check_update};
+use crate::version::{Version, get_current_version, save_version, check_update, get_latest_version_from_github};
 use crate::Args;
 use anyhow::Result;
 use log::{info, debug, warn};
@@ -23,7 +23,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::env;
 use std::collections::HashMap;
-use libloading::{Library, Symbol};
 
 /// 组件状态
 #[derive(Debug, Clone)]
@@ -56,39 +55,17 @@ pub struct Installer {
     pub component_status: HashMap<String, ComponentStatus>,
     /// 临时目录
     pub temp_dir: PathBuf,
-    /// 插件加载器
-    pub plugins: Vec<Box<dyn Plugin>>,
     /// 已安装的文件列表，用于回滚
     pub installed_files: Vec<PathBuf>,
     /// 已安装的组件列表，用于回滚
     pub installed_components: Vec<String>,
     /// 已创建的快捷方式列表，用于回滚
     pub created_shortcuts: Vec<PathBuf>,
-    /// 是否已添加到PATH，用于回滚
-    pub added_to_path: bool,
     /// 是否已创建卸载程序，用于回滚
     pub created_uninstaller: bool,
 }
 
-/// 插件接口
-pub trait Plugin: Send + Sync {
-    /// 插件名称
-    fn name(&self) -> &str;
-    /// 初始化插件
-    fn init(&mut self, config: &Config) -> Result<()>;
-    /// 安装前调用
-    fn pre_install(&self, installer: &mut Installer) -> Result<()>;
-    /// 安装后调用
-    fn post_install(&self, installer: &mut Installer) -> Result<()>;
-    /// 卸载前调用
-    fn pre_uninstall(&self, installer: &mut Installer) -> Result<()>;
-    /// 卸载后调用
-    fn post_uninstall(&self, installer: &mut Installer) -> Result<()>;
-    /// 修复前调用
-    fn pre_repair(&self, installer: &mut Installer) -> Result<()>;
-    /// 修复后调用
-    fn post_repair(&self, installer: &mut Installer) -> Result<()>;
-}
+
 
 impl Installer {
     /// 创建新的安装器实例
@@ -119,9 +96,6 @@ impl Installer {
             }
         }
         
-        // 初始化插件列表
-        let plugins: Vec<Box<dyn Plugin>> = Vec::new();
-        
         debug!("Installer instance created with install_dir: {install_dir:?}");
         debug!("Temporary directory: {temp_dir:?}");
         debug!("Initial component count: {}", component_status.len());
@@ -135,9 +109,6 @@ impl Installer {
         // 初始化已创建快捷方式列表
         let created_shortcuts: Vec<PathBuf> = Vec::new();
         
-        // 初始化添加到PATH状态
-        let added_to_path = false;
-        
         // 初始化创建卸载程序状态
         let created_uninstaller = false;
         
@@ -149,17 +120,24 @@ impl Installer {
             install_options,
             component_status,
             temp_dir,
-            plugins,
             installed_files,
             installed_components,
             created_shortcuts,
-            added_to_path,
             created_uninstaller,
         })
     }
     
     /// 执行安装
     pub fn install(&mut self) -> Result<()> {
+        // 打印欢迎信息
+        println!("\x1b[1;36m========================================\x1b[0m");
+        println!("\x1b[1;36m      SeeSea Installer v{}\x1b[0m", env!("CARGO_PKG_VERSION"));
+        println!("\x1b[1;36m========================================\x1b[0m");
+        println!("\x1b[1;32m✓\x1b[0m Starting installation process");
+        println!("\x1b[1;32m✓\x1b[0m Install directory: {}", self.install_dir.display());
+        println!("\x1b[1;32m✓\x1b[0m Install options: {install_options:?}", install_options = self.install_options);
+        println!();
+        
         info!("Starting installation process");
         debug!("Install options: {install_options:?}", install_options = self.install_options);
         
@@ -167,19 +145,36 @@ impl Installer {
         let result = self.install_internal();
         
         if let Err(e) = &result {
+            println!();
+            println!("\x1b[1;31m✗\x1b[0m Installation failed!");
+            println!("\x1b[1;31m✗\x1b[0m Error: {e:?}");
+            println!("\x1b[1;33m→\x1b[0m Starting rollback...");
             info!("Installation failed, starting rollback...");
             debug!("Error: {e:?}");
             if let Err(rollback_err) = self.rollback() {
                 warn!("Rollback failed: {rollback_err:?}");
+                println!("\x1b[1;31m✗\x1b[0m Rollback failed: {rollback_err:?}");
+            } else {
+                println!("\x1b[1;32m✓\x1b[0m Rollback completed");
             }
             // 清理临时文件
             if let Err(cleanup_err) = self.cleanup() {
                 warn!("Cleanup failed: {cleanup_err:?}");
+                println!("\x1b[1;31m✗\x1b[0m Cleanup failed: {cleanup_err:?}");
+            } else {
+                println!("\x1b[1;32m✓\x1b[0m Cleanup completed");
             }
         } else {
             // 安装成功，清理临时文件
+            println!();
+            println!("\x1b[1;32m✓\x1b[0m Cleaning up temporary files");
             info!("Cleaning up temporary files");
             self.cleanup()?;
+            
+            println!("\x1b[1;36m========================================\x1b[0m");
+            println!("\x1b[1;32m✓\x1b[0m Installation completed successfully!");
+            println!("\x1b[1;32m✓\x1b[0m SeeSea has been installed to: {}", self.install_dir.display());
+            println!("\x1b[1;36m========================================\x1b[0m");
             info!("Installation completed successfully");
         }
         
@@ -188,44 +183,33 @@ impl Installer {
     
     /// 内部安装方法，包含实际安装逻辑
     fn install_internal(&mut self) -> Result<()> {
-        // 1. 加载插件
-        info!("Loading plugins");
-        self.load_plugins()?;
-        
-        // 2. 执行插件的pre_install方法
-        self.run_plugin_pre_install()?;
-        
-        // 3. 执行预安装脚本
+        // 1. 执行预安装脚本
         if let Some(pre_script) = &self.install_options.pre_install_script {
             info!("Running pre-install script");
             execute_command(pre_script, Some(&self.temp_dir))?;
         }
         
-        // 4. 检查系统要求
+        // 2. 检查系统要求
         info!("Checking system requirements");
         self.platform.check_system_requirements(&self.config)?;
         
-        // 5. 创建安装目录
+        // 3. 创建安装目录
         info!("Creating install directory: {install_dir:?}", install_dir = self.install_dir);
         create_directory(&self.install_dir)?;
         
-        // 6. 安装依赖
-        if let Some(deps) = &self.config.dependencies {
-            if !deps.is_empty() {
-                info!("Installing dependencies");
-                self.install_dependencies()?;
-            }
-        }
-        
-        // 7. 安装组件
+        // 4. 安装组件
         info!("Installing components");
         self.install_components()?;
         
-        // 8. 复制安装文件
+        // 5. 复制安装文件
         info!("Copying installation files");
         self.copy_install_files()?;
         
-        // 9. 创建快捷方式
+        // 6. 安装依赖
+        info!("Installing dependencies");
+        self.install_dependencies()?;
+        
+        // 7. 创建快捷方式
         if self.install_options.create_desktop_shortcut {
             info!("Creating desktop shortcut");
             self.platform.create_desktop_shortcut(&self.config, &self.install_dir)?;
@@ -236,38 +220,28 @@ impl Installer {
             self.platform.create_start_menu_shortcut(&self.config, &self.install_dir)?;
         }
         
-        // 10. 添加到PATH环境变量
-        if self.install_options.add_to_path {
-            info!("Adding to PATH environment variable");
-            self.platform.add_to_path(&self.install_dir)?;
-            self.added_to_path = true;
-        }
-        
-        // 11. 创建系统服务
+        // 8. 创建系统服务
         if self.install_options.create_service {
             info!("Creating system service");
             self.create_service()?;
         }
         
-        // 12. 创建卸载程序
+        // 9. 创建卸载程序
         if self.install_options.create_uninstaller {
             info!("Creating uninstaller");
             self.platform.create_uninstaller(&self.config, &self.install_dir)?;
             self.created_uninstaller = true;
         }
         
-        // 13. 执行自定义安装后命令
+        // 11. 执行自定义安装后命令
         info!("Running post-install commands");
         self.run_post_install_commands()?;
         
-        // 14. 执行后安装脚本
+        // 12. 执行后安装脚本
         if let Some(post_script) = &self.install_options.post_install_script {
             info!("Running post-install script");
             execute_command(post_script, Some(&self.install_dir))?;
         }
-        
-        // 15. 执行插件的post_install方法
-        self.run_plugin_post_install()?;
         
         Ok(())
     }
@@ -276,16 +250,7 @@ impl Installer {
     fn rollback(&mut self) -> Result<()> {
         info!("Performing rollback...");
         
-        // 1. 回滚添加到PATH环境变量
-        if self.added_to_path {
-            info!("Rolling back PATH environment variable");
-            if let Err(e) = self.platform.remove_from_path(&self.install_dir) {
-                warn!("Failed to rollback PATH: {e:?}");
-            }
-            self.added_to_path = false;
-        }
-        
-        // 2. 回滚创建卸载程序
+        // 1. 回滚创建卸载程序
         if self.created_uninstaller {
             info!("Rolling back uninstaller");
             if let Err(e) = self.platform.remove_uninstaller(&self.config) {
@@ -294,13 +259,13 @@ impl Installer {
             self.created_uninstaller = false;
         }
         
-        // 3. 回滚创建快捷方式
+        // 2. 回滚创建快捷方式
         info!("Rolling back shortcuts");
         if let Err(e) = self.platform.remove_shortcuts(&self.config) {
             warn!("Failed to rollback shortcuts: {e:?}");
         }
         
-        // 4. 删除已安装的文件
+        // 3. 删除已安装的文件
         info!("Rolling back installed files");
         for file_path in &self.installed_files {
             if file_path.exists() {
@@ -311,7 +276,7 @@ impl Installer {
         }
         self.installed_files.clear();
         
-        // 5. 删除安装目录
+        // 4. 删除安装目录
         info!("Rolling back install directory");
         if self.install_dir.exists() {
             if let Err(e) = std::fs::remove_dir_all(&self.install_dir) {
@@ -320,75 +285,6 @@ impl Installer {
         }
         
         info!("Rollback completed");
-        Ok(())
-    }
-    
-    /// 加载插件
-    fn load_plugins(&mut self) -> Result<()> {
-        debug!("Loading plugins");
-        
-        if let Some(plugin_configs) = &self.config.plugins {
-            for plugin_config in plugin_configs {
-                info!("Loading plugin: {0}", plugin_config.name);
-                debug!("Plugin path: {0}", plugin_config.path);
-                
-                // 加载动态库
-                let lib = unsafe { Library::new(&plugin_config.path)? };
-                
-                // 定义插件初始化函数签名
-                type PluginInit = unsafe fn() -> *mut dyn Plugin;
-                
-                // 获取插件初始化函数
-                let init: Symbol<PluginInit> = unsafe { lib.get(b"plugin_init")? };
-                
-                // 调用初始化函数获取插件实例
-                let plugin_ptr = unsafe { init() };
-                let mut plugin = unsafe { Box::from_raw(plugin_ptr) };
-                
-                // 初始化插件
-                plugin.init(&self.config)?;
-                
-                // 添加到插件列表
-                self.plugins.push(plugin);
-                
-                info!("Plugin loaded successfully: {0}", plugin_config.name);
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// 执行插件的pre_install方法
-    fn run_plugin_pre_install(&mut self) -> Result<()> {
-        debug!("Running plugin pre_install methods");
-        
-        // 临时取出插件列表，避免同时持有self的可变借用
-        let mut plugins = std::mem::take(&mut self.plugins);
-        
-        for plugin in plugins.iter_mut() {
-            plugin.pre_install(self)?;
-        }
-        
-        // 将插件列表放回
-        self.plugins = plugins;
-        
-        Ok(())
-    }
-    
-    /// 执行插件的post_install方法
-    fn run_plugin_post_install(&mut self) -> Result<()> {
-        debug!("Running plugin post_install methods");
-        
-        // 临时取出插件列表，避免同时持有self的可变借用
-        let mut plugins = std::mem::take(&mut self.plugins);
-        
-        for plugin in plugins.iter_mut() {
-            plugin.post_install(self)?;
-        }
-        
-        // 将插件列表放回
-        self.plugins = plugins;
-        
         Ok(())
     }
     
@@ -560,9 +456,11 @@ impl Installer {
         debug!("Update options: check={}, backup_dir={:?}, force={}", 
                self.args.check, self.args.backup_dir, self.args.force);
         
-        // 解析当前版本和新版本
+        // 解析当前版本
         let current_version = get_current_version(&self.install_dir)?;
-        let new_version = Version::parse(&self.config.project.version)?;
+        
+        // 从GitHub获取最新版本
+        let new_version = get_latest_version_from_github()?;
         
         // 仅检查更新
         if self.args.check {
@@ -624,24 +522,17 @@ impl Installer {
         info!("Starting internal update process");
         debug!("New version: {new_version:?}");
         
-        // 1. 加载插件
-        info!("Loading plugins");
-        self.load_plugins()?;
-        
-        // 2. 执行插件的pre_install方法
-        self.run_plugin_pre_install()?;
-        
-        // 3. 执行预安装脚本
+        // 1. 执行预安装脚本
         if let Some(pre_script) = &self.install_options.pre_install_script {
             info!("Running pre-install script");
             execute_command(pre_script, Some(&self.temp_dir))?;
         }
         
-        // 4. 检查系统要求
+        // 2. 检查系统要求
         info!("Checking system requirements");
         self.platform.check_system_requirements(&self.config)?;
         
-        // 5. 安装依赖
+        // 3. 安装依赖
         if let Some(deps) = &self.config.dependencies {
             if !deps.is_empty() {
                 info!("Installing dependencies");
@@ -649,15 +540,15 @@ impl Installer {
             }
         }
         
-        // 6. 安装组件
+        // 4. 安装组件
         info!("Installing components");
         self.install_components()?;
         
-        // 7. 复制安装文件
+        // 5. 复制安装文件
         info!("Copying installation files");
         self.copy_install_files()?;
         
-        // 8. 更新快捷方式
+        // 6. 更新快捷方式
         if self.install_options.create_desktop_shortcut {
             info!("Updating desktop shortcut");
             self.platform.remove_shortcuts(&self.config)?;
@@ -669,39 +560,36 @@ impl Installer {
             self.platform.create_start_menu_shortcut(&self.config, &self.install_dir)?;
         }
         
-        // 9. 确保在PATH环境变量中
+        // 7. 确保在PATH环境变量中
         if self.install_options.add_to_path {
             info!("Ensuring in PATH environment variable");
             self.platform.add_to_path(&self.install_dir)?;
         }
         
-        // 10. 更新服务配置
+        // 8. 更新服务配置
         if self.install_options.create_service {
             info!("Updating system service");
             self.create_service()?;
         }
         
-        // 11. 更新卸载程序
+        // 9. 更新卸载程序
         if self.install_options.create_uninstaller {
             info!("Updating uninstaller");
             self.platform.create_uninstaller(&self.config, &self.install_dir)?;
         }
         
-        // 12. 执行自定义安装后命令
+        // 10. 执行自定义安装后命令
         info!("Running post-install commands");
         self.run_post_install_commands()?;
         
-        // 13. 执行后安装脚本
+        // 11. 执行后安装脚本
         if let Some(post_script) = &self.install_options.post_install_script {
             info!("Running post-install script");
             execute_command(post_script, Some(&self.install_dir))?;
         }
         
-        // 14. 保存新的版本号
+        // 12. 保存新的版本号
         save_version(&self.install_dir, new_version)?;
-        
-        // 15. 执行插件的post_install方法
-        self.run_plugin_post_install()?;
         
         Ok(())
     }
@@ -722,15 +610,57 @@ impl Installer {
         info!("Removing from PATH environment variable");
         self.platform.remove_from_path(&self.install_dir)?;
         
-        // 4. 删除安装目录
+        // 4. 使用pip卸载seesea和seesea-core
+        info!("Uninstalling Python packages using pip");
+        let pip_cmd = if cfg!(target_os = "windows") {
+            "pip" 
+        } else {
+            "pip3"
+        };
+        
+        // 卸载seesea包，忽略错误
+        info!("Uninstalling seesea package");
+        println!("执行命令: {pip_cmd} uninstall -y seesea");
+        let status = std::process::Command::new(pip_cmd)
+            .args(["uninstall", "-y", "seesea"])
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .status();
+        println!("命令执行状态: {:?}", status);
+        
+        // 卸载seesea-core包，忽略错误
+        info!("Uninstalling seesea-core package");
+        println!("执行命令: {pip_cmd} uninstall -y seesea-core");
+        let status = std::process::Command::new(pip_cmd)
+            .args(["uninstall", "-y", "seesea-core"])
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .status();
+        println!("命令执行状态: {:?}", status);
+        
+        // 5. 删除安装目录
         info!("Removing install directory: {install_dir:?}", install_dir = self.install_dir);
         if self.install_dir.exists() {
+            // 先保存uninstaller路径，因为我们需要在删除目录前删除它
+            let uninstaller_path = self.install_dir.join("uninstall.exe");
+            
+            // 6. 删除卸载程序
+            info!("Removing uninstaller");
+            self.platform.remove_uninstaller(&self.config)?;
+            
+            // 7. 删除安装目录
+            // 先删除uninstall.exe，因为它正在运行
+            if uninstaller_path.exists() {
+                std::fs::remove_file(&uninstaller_path)?;
+            }
+            
+            // 删除剩余的安装目录
             fs::remove_dir_all(&self.install_dir)?;
+        } else {
+            // 安装目录不存在，只删除卸载程序信息
+            info!("Install directory not found, only removing uninstaller information");
+            self.platform.remove_uninstaller(&self.config)?;
         }
-        
-        // 5. 删除卸载程序
-        info!("Removing uninstaller");
-        self.platform.remove_uninstaller(&self.config)?;
         
         info!("Uninstallation completed successfully");
         Ok(())
@@ -776,13 +706,13 @@ impl Installer {
         let exe_dir = exe_path.parent().ok_or_else(|| anyhow::anyhow!("Failed to get executable directory"))?;
         
         // 复制安装文件到目标目录
-        // 这里假设安装文件在installer目录下的payload子目录中
-        let payload_dir = exe_dir.join("payload");
-        if payload_dir.exists() {
-            debug!("Copying files from {payload_dir:?} to {install_dir:?}", install_dir = self.install_dir);
+        // 使用building目录作为资源目录，这是cargo-packager打包时指定的
+        let building_dir = exe_dir.join("building");
+        if building_dir.exists() {
+            debug!("Copying files from {building_dir:?} to {install_dir:?}", install_dir = self.install_dir);
             
-            // 遍历payload目录下的所有文件
-            for entry in std::fs::read_dir(&payload_dir)? {
+            // 遍历building目录下的所有文件
+            for entry in std::fs::read_dir(&building_dir)? {
                 let entry = entry?;
                 let src_path = entry.path();
                 if src_path.is_file() {
@@ -797,7 +727,7 @@ impl Installer {
                 }
             }
         } else {
-            warn!("Payload directory not found: {payload_dir:?}");
+            warn!("Building directory not found: {building_dir:?}");
         }
         
         Ok(())
@@ -805,20 +735,106 @@ impl Installer {
     
     /// 安装依赖
     fn install_dependencies(&self) -> Result<()> {
-        if let Some(deps) = &self.config.dependencies {
-            for dep in deps {
-                info!("Installing dependency: {0}", dep.name);
-                debug!("Dependency config: {dep:?}");
-                
-                if let Some(cmd) = &dep.install_command {
-                    debug!("Executing dependency install command: {cmd}");
-                    execute_command(cmd, None)?;
-                } else {
-                    debug!("No install command specified for dependency: {0}", dep.name);
+        // 检查Python环境
+        info!("Checking Python environment");
+        let python_cmd = if cfg!(target_os = "windows") {
+            "python" 
+        } else {
+            "python3"
+        };
+        
+        let python_check = execute_command(format!("{python_cmd} --version").as_str(), None);
+        if python_check.is_err() {
+            anyhow::bail!("Python is not installed or not in PATH");
+        }
+        
+        // 检查pip环境
+        info!("Checking pip environment");
+        let pip_cmd = if cfg!(target_os = "windows") {
+            "pip" 
+        } else {
+            "pip3"
+        };
+        
+        let pip_check = execute_command(format!("{pip_cmd} --version").as_str(), None);
+        if pip_check.is_err() {
+            anyhow::bail!("pip is not installed or not in PATH");
+        }
+        
+        // 收集所有whl文件
+        let mut whl_files = Vec::new();
+        for entry in std::fs::read_dir(&self.install_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+                if file_name.ends_with(".whl") {
+                    whl_files.push(path);
+                    info!("Found whl file: {file_name}");
                 }
             }
         }
         
+        if whl_files.is_empty() {
+            warn!("No whl files found in install directory");
+            return Ok(());
+        }
+        
+        // 根据平台执行不同的安装逻辑
+        if cfg!(target_os = "linux") {
+            // Linux平台：使用虚拟环境安装
+            info!("Installing on Linux platform");
+            
+            // 创建安装目录
+            let install_base_dir = Path::new("/etc/seesea");
+            create_directory(install_base_dir)?;
+            
+            // 创建虚拟环境
+            let venv_dir = install_base_dir.join("venv");
+            if !venv_dir.exists() {
+                info!("Creating virtual environment at: {venv_dir:?}");
+                execute_command(format!("{python_cmd} -m venv {}", venv_dir.to_str().unwrap()).as_str(), None)?;
+            }
+            
+            // 虚拟环境中的pip命令
+            let venv_pip = venv_dir.join("bin").join("pip");
+            
+            // 安装所有whl文件
+            for whl_file in &whl_files {
+                info!("Installing whl file in virtual environment: {whl_file:?}");
+                execute_command(format!("{} install {}", venv_pip.to_str().unwrap(), whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+            // 创建bash脚本，导出seesea命令
+            let bash_script_path = Path::new("/usr/local/bin/seesea");
+            let bash_script_content = format!("#!/bin/bash\n\n{}/bin/seesea \"$@\"\n", venv_dir.to_str().unwrap());
+            
+            info!("Creating bash script at: {bash_script_path:?}");
+            std::fs::write(bash_script_path, bash_script_content)?;
+            
+            // 设置脚本执行权限
+            execute_command(format!("chmod +x {}", bash_script_path.to_str().unwrap()).as_str(), None)?;
+            
+        } else if cfg!(target_os = "windows") {
+            // Windows平台：直接安装
+            info!("Installing on Windows platform");
+            
+            for whl_file in &whl_files {
+                info!("Installing whl file: {whl_file:?}");
+                execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+        } else if cfg!(target_os = "macos") {
+            // macOS平台：直接安装
+            info!("Installing on macOS platform");
+            
+            for whl_file in &whl_files {
+                info!("Installing whl file: {whl_file:?}");
+                execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+        }
+        
+        info!("All dependencies installed successfully");
         Ok(())
     }
     

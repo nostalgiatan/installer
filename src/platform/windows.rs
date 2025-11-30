@@ -43,16 +43,19 @@ impl super::Platform for WindowsImpl {
     fn get_install_options(&self, config: &Config) -> Result<InstallOptions> {
         debug!("Getting Windows specific install options");
         
-        // 如果配置中有Windows特定选项，则使用它，否则使用全局选项
+        // 先获取全局安装选项
+        let mut install_options = config.install_options.clone();
+        
+        // 如果配置中有Windows特定选项，则用它们覆盖全局选项
         if let Some(platform_config) = &config.platform {
-            if let Some(windows_config) = &platform_config.windows {
-                debug!("Using Windows specific install options from config");
-                return Ok(windows_config.clone());
+            if let Some(default_dir) = &platform_config.windows_default_dir {
+                debug!("Using Windows specific default_dir: {default_dir}");
+                install_options.default_dir = default_dir.clone();
             }
         }
         
-        debug!("Using global install options");
-        Ok(config.install_options.clone())
+        debug!("Using merged install options");
+        Ok(install_options)
     }
     
     /// 检查系统要求
@@ -159,7 +162,7 @@ impl super::Platform for WindowsImpl {
         let install_dir_str = install_dir.to_string_lossy();
         if !current_path.contains(&*install_dir_str) {
             // 添加安装目录到PATH
-            let separator = current_path.ends_with(";").then_some("").unwrap_or(";").to_string();
+            let separator = if current_path.ends_with(";") { "" } else { ";" }.to_string();
             let new_path = format!("{current_path}{separator}{install_dir_str}");
             env_key.set_value("Path", &new_path)?;
             debug!("New PATH: {new_path}");

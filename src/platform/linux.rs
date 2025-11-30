@@ -58,16 +58,19 @@ impl super::Platform for LinuxImpl {
     fn get_install_options(&self, config: &Config) -> Result<InstallOptions> {
         debug!("Getting Linux specific install options");
         
-        // 如果配置中有Linux特定选项，则使用它，否则使用全局选项
+        // 先获取全局安装选项
+        let mut install_options = config.install_options.clone();
+        
+        // 如果配置中有Linux特定选项，则用它们覆盖全局选项
         if let Some(platform_config) = &config.platform {
-            if let Some(linux_config) = &platform_config.linux {
-                debug!("Using Linux specific install options from config");
-                return Ok(linux_config.clone());
+            if let Some(default_dir) = &platform_config.linux_default_dir {
+                debug!("Using Linux specific default_dir: {default_dir}");
+                install_options.default_dir = default_dir.clone();
             }
         }
         
-        debug!("Using global install options");
-        Ok(config.install_options.clone())
+        debug!("Using merged install options");
+        Ok(install_options)
     }
     
     /// 检查系统要求
@@ -270,6 +273,9 @@ impl super::Platform for LinuxImpl {
     fn create_uninstaller(&self, config: &Config, install_dir: &Path) -> Result<()> {
         info!("Creating uninstaller on Linux");
         
+        // 获取当前安装程序路径
+        let current_exe = env::current_exe()?;
+        
         // 卸载脚本内容
         let uninstall_script = format!(
             "#!/bin/bash\n"
@@ -277,24 +283,13 @@ impl super::Platform for LinuxImpl {
             "\n"
             "echo \"Uninstalling {}-{}...\"\n"
             "\n"
-            "# 删除安装目录\n"
-            "rm -rf {}\n"
-            "\n"
-            "# 删除桌面快捷方式\n"
-            "rm -f \$HOME/Desktop/{}.desktop\n"
-            "\n"
-            "# 删除应用程序菜单快捷方式\n"
-            "rm -f \$HOME/.local/share/applications/{}.desktop\n"
-            "\n"
-            "# 删除卸载脚本\n"
-            "rm -f \$0\n"
+            "# 调用安装程序的卸载命令\n"
+            "\"{}\" uninstall\n"
             "\n"
             "echo \"Uninstallation completed successfully!\"\n",
             config.project.name,
             config.project.version,
-            install_dir.display(),
-            config.project.name,
-            config.project.name
+            current_exe.display()
         );
         
         // 写入卸载脚本
