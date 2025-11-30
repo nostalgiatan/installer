@@ -708,67 +708,53 @@ impl Installer {
         let exe_dir = exe_path.parent().ok_or_else(|| anyhow::anyhow!("Failed to get executable directory"))?;
         
         // 尝试多种路径查找building目录
-        let mut building_dirs_to_try = Vec::new();
-        building_dirs_to_try.push(exe_dir.join("building"));
-        building_dirs_to_try.push(exe_dir.join("resources").join("building"));
-        building_dirs_to_try.push(exe_dir.parent().unwrap().join("building"));
-        building_dirs_to_try.push(Path::new("./building").to_path_buf());
+        let mut building_paths = Vec::new();
         
-        // 复制安装文件到目标目录
-        let mut building_dir_found = false;
-        for building_dir in &building_dirs_to_try {
-            if building_dir.exists() {
-                debug!("Copying files from {building_dir:?} to {install_dir:?}", install_dir = self.install_dir);
-                
-                // 遍历building目录下的所有文件
-                for entry in std::fs::read_dir(building_dir)? {
-                    let entry = entry?;
-                    let src_path = entry.path();
-                    if src_path.is_file() {
-                        let dest_path = self.install_dir.join(src_path.file_name().unwrap());
-                        
-                        // 复制文件
-                        std::fs::copy(&src_path, &dest_path)?;
-                        
-                        // 添加到已安装文件列表
-                        self.installed_files.push(dest_path.clone());
-                        debug!("Copied file: {src_path:?} -> {dest_path:?}");
-                    }
+        // 当前可执行文件所在目录的building子目录
+        building_paths.push(exe_dir.join("building"));
+        
+        // 当前目录
+        building_paths.push(PathBuf::from("building"));
+        
+        // 上级目录
+        building_paths.push(PathBuf::from("../building"));
+        building_paths.push(PathBuf::from("../../building"));
+        
+        // 系统安装目录
+        building_paths.push(PathBuf::from("/opt/seesea/building"));
+        building_paths.push(PathBuf::from("C:\\Program Files\\SeeSea\\building"));
+        building_paths.push(PathBuf::from("/Applications/SeeSea\\building"));
+        
+        // 查找存在的building目录
+        let mut found_building_dir = None;
+        for path in &building_paths {
+            if path.exists() && path.is_dir() {
+                found_building_dir = Some(path);
+                break;
+            }
+        }
+        
+        if let Some(building_dir) = found_building_dir {
+            debug!("Copying files from {building_dir:?} to {install_dir:?}", install_dir = self.install_dir);
+            
+            // 遍历building目录下的所有文件
+            for entry in std::fs::read_dir(building_dir)? {
+                let entry = entry?;
+                let src_path = entry.path();
+                if src_path.is_file() {
+                    let dest_path = self.install_dir.join(src_path.file_name().unwrap());
+                    
+                    // 复制文件
+                    std::fs::copy(&src_path, &dest_path)?;
+                    
+                    // 添加到已安装文件列表
+                    self.installed_files.push(dest_path.clone());
+                    debug!("Copied file: {src_path:?} -> {dest_path:?}");
                 }
-                building_dir_found = true;
-                break;
             }
-        }
-        
-        if !building_dir_found {
-            warn!("Building directory not found in any of the tried paths: {building_dirs_to_try:?}");
-        }
-        
-        // 尝试多种路径查找install.toml文件
-        let mut install_toml_paths_to_try = Vec::new();
-        install_toml_paths_to_try.push(exe_dir.join("install.toml"));
-        install_toml_paths_to_try.push(exe_dir.join("resources").join("install.toml"));
-        install_toml_paths_to_try.push(exe_dir.parent().unwrap().join("install.toml"));
-        install_toml_paths_to_try.push(Path::new("./install.toml").to_path_buf());
-        
-        let mut install_toml_found = false;
-        for install_toml_path in &install_toml_paths_to_try {
-            if install_toml_path.exists() {
-                let dest_path = self.install_dir.join("install.toml");
-                
-                // 复制文件
-                std::fs::copy(install_toml_path, &dest_path)?;
-                
-                // 添加到已安装文件列表
-                self.installed_files.push(dest_path.clone());
-                debug!("Copied file: {install_toml_path:?} -> {dest_path:?}");
-                install_toml_found = true;
-                break;
-            }
-        }
-        
-        if !install_toml_found {
-            warn!("Install.toml file not found in any of the tried paths: {install_toml_paths_to_try:?}");
+        } else {
+            warn!("Building directory not found at any of the tried paths: {building_paths:?}");
+            anyhow::bail!("Building directory not found");
         }
         
         Ok(())
@@ -816,70 +802,62 @@ impl Installer {
             }
         }
         
+        if whl_files.is_empty() {
+            warn!("No whl files found in install directory");
+            return Ok(());
+        }
+        
         // 根据平台执行不同的安装逻辑
-        if !whl_files.is_empty() {
-            info!("Installing {} whl files", whl_files.len());
+        if cfg!(target_os = "linux") {
+            // Linux平台：使用虚拟环境安装
+            info!("Installing on Linux platform");
             
-            if cfg!(target_os = "linux") {
-                // Linux平台：使用虚拟环境安装
-                info!("Installing on Linux platform");
-                
-                // 创建安装目录
-                let install_base_dir = Path::new("/etc/seesea");
-                create_directory(install_base_dir)?;
-                
-                // 创建虚拟环境
-                let venv_dir = install_base_dir.join("venv");
-                if !venv_dir.exists() {
-                    info!("Creating virtual environment at: {venv_dir:?}");
-                    execute_command(format!("{python_cmd} -m venv {}", venv_dir.to_str().unwrap()).as_str(), None)?;
-                }
-                
-                // 虚拟环境中的pip命令
-                let venv_pip = venv_dir.join("bin").join("pip");
-                
-                // 安装所有whl文件
-                for whl_file in &whl_files {
-                    info!("Installing whl file in virtual environment: {whl_file:?}");
-                    execute_command(format!("{} install {}", venv_pip.to_str().unwrap(), whl_file.to_str().unwrap()).as_str(), None)?;
-                }
-                
-                // 创建bash脚本，导出seesea命令
-                let bash_script_path = Path::new("/usr/local/bin/seesea");
-                let bash_script_content = format!("#!/bin/bash\n\n{}/bin/seesea \"$@\"\n", venv_dir.to_str().unwrap());
-                
-                info!("Creating bash script at: {bash_script_path:?}");
-                std::fs::write(bash_script_path, bash_script_content)?;
-                
-                // 设置脚本执行权限
-                execute_command(format!("chmod +x {}", bash_script_path.to_str().unwrap()).as_str(), None)?;
-                
-            } else if cfg!(target_os = "windows") {
-                // Windows平台：直接安装
-                info!("Installing on Windows platform");
-                
-                for whl_file in &whl_files {
-                    info!("Installing whl file: {whl_file:?}");
-                    execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
-                }
-                
-            } else if cfg!(target_os = "macos") {
-                // macOS平台：直接安装
-                info!("Installing on macOS platform");
-                
-                for whl_file in &whl_files {
-                    info!("Installing whl file: {whl_file:?}");
-                    execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
-                }
+            // 创建安装目录
+            let install_base_dir = Path::new("/etc/seesea");
+            create_directory(install_base_dir)?;
+            
+            // 创建虚拟环境
+            let venv_dir = install_base_dir.join("venv");
+            if !venv_dir.exists() {
+                info!("Creating virtual environment at: {venv_dir:?}");
+                execute_command(format!("{python_cmd} -m venv {}", venv_dir.to_str().unwrap()).as_str(), None)?;
             }
-        } else {
-            // 如果没有找到whl文件，直接使用pip安装
-            info!("No whl files found, using pip to install packages directly");
-            let packages = ["seesea", "seesea-core"];
             
-            for package in &packages {
-                info!("Installing package: {}", package);
-                execute_command(format!("{pip_cmd} install {}", package).as_str(), None)?;
+            // 虚拟环境中的pip命令
+            let venv_pip = venv_dir.join("bin").join("pip");
+            
+            // 安装所有whl文件
+            for whl_file in &whl_files {
+                info!("Installing whl file in virtual environment: {whl_file:?}");
+                execute_command(format!("{} install {}", venv_pip.to_str().unwrap(), whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+            // 创建bash脚本，导出seesea命令
+            let bash_script_path = Path::new("/usr/local/bin/seesea");
+            let bash_script_content = format!("#!/bin/bash\n\n{}/bin/seesea \"$@\"\n", venv_dir.to_str().unwrap());
+            
+            info!("Creating bash script at: {bash_script_path:?}");
+            std::fs::write(bash_script_path, bash_script_content)?;
+            
+            // 设置脚本执行权限
+            execute_command(format!("chmod +x {}", bash_script_path.to_str().unwrap()).as_str(), None)?;
+            
+        } else if cfg!(target_os = "windows") {
+            // Windows平台：直接安装
+            info!("Installing on Windows platform");
+            
+            for whl_file in &whl_files {
+                info!("Installing whl file: {whl_file:?}");
+                execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+        } else if cfg!(target_os = "macos") {
+            // macOS平台：直接安装
+            info!("Installing on macOS platform");
+            
+            for whl_file in &whl_files {
+                info!("Installing whl file: {whl_file:?}");
+                execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
             }
         }
         

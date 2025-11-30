@@ -219,6 +219,18 @@ pub fn load_config(config_path: &str) -> Result<Config> {
     paths_to_try.push(format!("../{config_path}"));
     paths_to_try.push(format!("../../{config_path}"));
     
+    // 添加当前可执行文件所在目录的查找
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            paths_to_try.push(exe_dir.join(config_path).to_string_lossy().to_string());
+        }
+    }
+    
+    // 添加系统安装目录的查找
+    paths_to_try.push("/opt/seesea/install.toml".to_string());
+    paths_to_try.push("C:\\Program Files\\SeeSea\\install.toml".to_string());
+    paths_to_try.push("/Applications/SeeSea/install.toml".to_string());
+    
     let mut file = None;
     let mut used_path = String::new();
     

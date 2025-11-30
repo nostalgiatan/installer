@@ -49,62 +49,13 @@ resources = ["../building", "../install.toml"]
 icons = ["../static/image/img.png"]
 
 [package.metadata.packager.windows]
-format = "nsis"
-nsis = {
-    display_language = "SimpChinese",
-    license = "../LICENSE",
-    icon = "../static/image/img.ico",
-    uninstaller_icon = "../static/image/img.ico",
-    header_icon = "../static/image/img.ico",
-    installer_icon = "../static/image/img.ico",
-    uninstaller_header_icon = "../static/image/img.ico",
-    compression = "lzma",
-    unicode = true,
-    multi_user = true,
-    allow_skip_page = true,
-    allow_reboot = false,
-    create_desktop_shortcut = true,
-    create_start_menu_shortcut = true,
-    add_to_path = true
-}
+format = "nsis"  # Windows生成NSIS安装程序
 
 [package.metadata.packager.macos]
-format = "dmg"
-dmg = {
-    icon = "../static/image/img.icns",
-    background = "../static/image/dmg_background.png",
-    window = {
-        width = 800,
-        height = 600
-    },
-    contents = [
-        {
-            x = 100,
-            y = 100,
-            type = "file",
-            path = "target/release/seesea-installer"
-        },
-        {
-            x = 700,
-            y = 100,
-            type = "link",
-            path = "/Applications"
-        }
-    ]
-}
+format = "dmg"  # macOS生成DMG镜像
 
 [package.metadata.packager.linux]
-format = "deb"
-deb = {
-    depends = ["python3", "python3-pip", "libssl3"],
-    section = "utils",
-    priority = "optional",
-    maintainer = "SeeSea Team",
-    homepage = "https://github.com/nostalgiatan/SeeSea",
-    license = "Apache-2.0",
-    compression = "xz",
-    desktop_entries = ["../static/desktop/seesea-installer.desktop"]
-}
+format = "deb"  # Linux生成deb包
 
 
 
