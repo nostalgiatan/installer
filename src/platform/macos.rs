@@ -15,8 +15,9 @@
 
 use crate::config::{Config, InstallOptions};
 use anyhow::Result;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::env;
+use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 
 /// macOS平台实现结构体
@@ -74,7 +75,7 @@ impl super::Platform for MacOSImpl {
     }
     
     /// 检查系统要求
-    fn check_system_requirements(&self, config: &Config) -> Result<()> {
+    fn check_system_requirements(&self, _config: &Config) -> Result<()> {
         info!("Checking macOS system requirements");
         // 简单实现，仅打印信息
         info!("System requirements check passed");
@@ -145,7 +146,7 @@ impl super::Platform for MacOSImpl {
         
         // 确定shell配置文件
         // macOS默认使用zsh
-        let shell_config = PathBuf::from(home_dir).join(".zshrc");
+        let shell_config = PathBuf::from(&home_dir).join(".zshrc");
         
         // 如果.zshrc不存在，尝试使用.bashrc
         let shell_config = if !shell_config.exists() {
@@ -190,9 +191,9 @@ impl super::Platform for MacOSImpl {
         
         // 检查可能的shell配置文件
         let shell_configs = [
-            PathBuf::from(home_dir).join(".zshrc"),
-            PathBuf::from(home_dir).join(".bashrc"),
-            PathBuf::from(home_dir).join(".profile"),
+            PathBuf::from(&home_dir).join(".zshrc"),
+            PathBuf::from(&home_dir).join(".bashrc"),
+            PathBuf::from(&home_dir).join(".profile"),
         ];
         
         let install_dir_str = install_dir.to_string_lossy().to_string();
@@ -252,7 +253,9 @@ impl super::Platform for MacOSImpl {
         std::fs::write(&self.uninstall_script_path, uninstall_script)?;
         
         // 设置可执行权限
-        std::fs::set_permissions(&self.uninstall_script_path, std::fs::Permissions::from_mode(0o755))?;
+        let mut permissions = std::fs::metadata(&self.uninstall_script_path)?.permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&self.uninstall_script_path, permissions)?
         
         info!("Uninstaller created successfully at: {}", self.uninstall_script_path);
         
@@ -293,7 +296,7 @@ impl super::Platform for MacOSImpl {
     }
     
     /// 删除卸载程序
-    fn remove_uninstaller(&self, config: &Config) -> Result<()> {
+    fn remove_uninstaller(&self, _config: &Config) -> Result<()> {
         info!("Removing uninstaller on macOS");
         
         // 删除卸载脚本
