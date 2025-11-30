@@ -113,7 +113,7 @@ impl super::Platform for LinuxImpl {
         // 设置快捷方式权限
         let mut permissions = std::fs::metadata(&shortcut_path)?.permissions();
         permissions.set_mode(0o755);
-        std::fs::set_permissions(&shortcut_path, permissions)?
+        std::fs::set_permissions(&shortcut_path, permissions)?;
         
         debug!("Desktop shortcut created successfully");
         
@@ -156,7 +156,7 @@ impl super::Platform for LinuxImpl {
         // 设置快捷方式权限
         let mut permissions = std::fs::metadata(&shortcut_path)?.permissions();
         permissions.set_mode(0o644);
-        std::fs::set_permissions(&shortcut_path, permissions)?
+        std::fs::set_permissions(&shortcut_path, permissions)?;
         
         debug!("Start menu shortcut created successfully");
         
@@ -257,7 +257,7 @@ impl super::Platform for LinuxImpl {
     }
     
     /// 创建卸载程序
-    fn create_uninstaller(&self, config: &Config, install_dir: &Path) -> Result<()> {
+    fn create_uninstaller(&self, config: &Config, _install_dir: &Path) -> Result<()> {
         info!("Creating uninstaller on Linux");
         
         // 获取当前安装程序路径
