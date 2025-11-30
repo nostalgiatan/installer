@@ -17,7 +17,7 @@ use crate::config::{Config, InstallOptions};
 use anyhow::Result;
 use log::{debug, info};
 use std::env;
-use std::os::unix::fs::{PermissionsExt, symlink};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 /// macOS平台实现结构体
@@ -235,15 +235,7 @@ impl super::Platform for MacOSImpl {
         
         // 卸载脚本内容
         let uninstall_script = format!(
-            "#!/bin/bash\n"
-            "# SeeSea Uninstaller for macOS\n"
-            "\n"
-            "echo \"Uninstalling {}-{}...\"\n"
-            "\n"
-            "# 调用安装程序的卸载命令\n"
-            "\"{}\" uninstall\n"
-            "\n"
-            "echo \"Uninstallation completed successfully!\"\n",
+            "#!/bin/bash\n# SeeSea Uninstaller for macOS\n\necho \"Uninstalling {}-{}...\"\n\n# 调用安装程序的卸载命令\n\"{}\" uninstall\n\necho \"Uninstallation completed successfully!\"\n",
             config.project.name,
             config.project.version,
             current_exe.display()
@@ -255,7 +247,7 @@ impl super::Platform for MacOSImpl {
         // 设置可执行权限
         let mut permissions = std::fs::metadata(&self.uninstall_script_path)?.permissions();
         permissions.set_mode(0o755);
-        std::fs::set_permissions(&self.uninstall_script_path, permissions)?
+        std::fs::set_permissions(&self.uninstall_script_path, permissions)?;
         
         info!("Uninstaller created successfully at: {}", self.uninstall_script_path);
         
