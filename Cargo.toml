@@ -49,13 +49,10 @@ resources = ["../building", "../install.toml"]
 icons = ["../static/image/img.png"]
 
 [package.metadata.packager.windows]
-format = "nsis"  # Windows生成NSIS安装程序
 
 [package.metadata.packager.macos]
-format = "dmg"  # macOS生成DMG镜像
 
 [package.metadata.packager.linux]
-format = "deb"  # Linux生成deb包
 
 
 
