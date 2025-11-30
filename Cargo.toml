@@ -39,9 +39,7 @@ tempfile = "3.10"
 name = "seesea-installer"
 path = "src/main.rs"
 
-# 确保Windows应用程序使用控制台子系统
-[target.'cfg(windows)'.runner]
-args = ["--console"]
+
 [package.metadata.packager]
 name = "SeeSea Installer"
 description = "SeeSea Self-Contained Installer"
