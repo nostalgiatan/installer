@@ -83,19 +83,25 @@ impl super::Platform for LinuxImpl {
     }
     
     /// 创建桌面快捷方式
-    fn create_desktop_shortcut(&self, config: &Config, install_dir: &Path) -> Result<()> {
+    fn create_desktop_shortcut(&self, config: &Config, _install_dir: &Path) -> Result<()> {
         info!("Creating desktop shortcut on Linux");
         
         // 获取桌面目录
         let desktop_dir = self.get_desktop_dir()?;
         debug!("Desktop directory: {:?}", desktop_dir);
         
+        // 确保桌面目录存在
+        if !desktop_dir.exists() {
+            debug!("Desktop directory does not exist, creating it: {:?}", desktop_dir);
+            std::fs::create_dir_all(&desktop_dir)?;
+        }
+        
         // 快捷方式路径
         let shortcut_path = desktop_dir.join(format!("{}.desktop", config.project.name));
         debug!("Shortcut path: {:?}", shortcut_path);
         
-        // 目标程序路径（假设主程序名为项目名）
-        let target_exe = install_dir.join(config.project.name.clone());
+        // 目标程序路径：使用我们创建的bash脚本路径
+        let target_exe = Path::new("/usr/local/bin/seesea");
         debug!("Target executable: {:?}", target_exe);
         
         // 创建.desktop文件内容
@@ -119,9 +125,9 @@ impl super::Platform for LinuxImpl {
         
         Ok(())
     }
-    
+
     /// 创建开始菜单快捷方式
-    fn create_start_menu_shortcut(&self, config: &Config, install_dir: &Path) -> Result<()> {
+    fn create_start_menu_shortcut(&self, config: &Config, _install_dir: &Path) -> Result<()> {
         info!("Creating start menu shortcut on Linux");
         
         // 获取应用程序菜单目录
@@ -137,8 +143,8 @@ impl super::Platform for LinuxImpl {
         let shortcut_path = app_menu_dir.join(format!("{}.desktop", config.project.name));
         debug!("Shortcut path: {:?}", shortcut_path);
         
-        // 目标程序路径（假设主程序名为项目名）
-        let target_exe = install_dir.join(config.project.name.clone());
+        // 目标程序路径：使用我们创建的bash脚本路径
+        let target_exe = Path::new("/usr/local/bin/seesea");
         debug!("Target executable: {:?}", target_exe);
         
         // 创建.desktop文件内容

@@ -612,45 +612,91 @@ impl Installer {
         info!("Removing from PATH environment variable");
         self.platform.remove_from_path(&self.install_dir)?;
         
-        // 4. 使用pip卸载seesea和seesea-core
-        info!("Uninstalling Python packages using pip");
-        let pip_cmd = if cfg!(target_os = "windows") {
-            "pip" 
+        // 4. 卸载Python包
+        info!("Uninstalling Python packages");
+        
+        if cfg!(target_os = "linux") {
+            // Linux平台：使用虚拟环境中的pip命令卸载
+            let venv_dir = Path::new("/etc/seesea/venv");
+            let venv_pip = venv_dir.join("bin").join("pip");
+            
+            if venv_pip.exists() {
+                // 卸载seesea包，忽略错误
+                info!("Uninstalling seesea package using virtual environment pip");
+                println!("执行命令: {} uninstall -y seesea", venv_pip.display());
+                let status = std::process::Command::new(venv_pip.clone())
+                    .args(["uninstall", "-y", "seesea"])
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status();
+                println!("命令执行状态: {status:?}");
+                
+                // 卸载seesea-core包，忽略错误
+                info!("Uninstalling seesea-core package using virtual environment pip");
+                println!("执行命令: {} uninstall -y seesea-core", venv_pip.display());
+                let status = std::process::Command::new(venv_pip)
+                    .args(["uninstall", "-y", "seesea-core"])
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status();
+                println!("命令执行状态: {status:?}");
+            } else {
+                warn!("Virtual environment pip not found, skipping Python package uninstallation");
+            }
+            
+            // 5. 删除虚拟环境目录
+            let see_sea_dir = Path::new("/etc/seesea");
+            if see_sea_dir.exists() {
+                info!("Removing virtual environment directory: {:?}", see_sea_dir);
+                fs::remove_dir_all(see_sea_dir)?;
+            }
+            
+            // 6. 删除命令导出文件
+            let seesea_cmd = Path::new("/usr/local/bin/seesea");
+            if seesea_cmd.exists() {
+                info!("Removing command export file: {:?}", seesea_cmd);
+                std::fs::remove_file(seesea_cmd)?;
+            }
         } else {
-            "pip3"
-        };
+            // Windows和macOS平台：使用系统pip命令卸载
+            let pip_cmd = if cfg!(target_os = "windows") {
+                "pip" 
+            } else {
+                "pip3"
+            };
+            
+            // 卸载seesea包，忽略错误
+            info!("Uninstalling seesea package");
+            println!("执行命令: {pip_cmd} uninstall -y seesea");
+            let status = std::process::Command::new(pip_cmd)
+                .args(["uninstall", "-y", "seesea"])
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .status();
+            println!("命令执行状态: {status:?}");
+            
+            // 卸载seesea-core包，忽略错误
+            info!("Uninstalling seesea-core package");
+            println!("执行命令: {pip_cmd} uninstall -y seesea-core");
+            let status = std::process::Command::new(pip_cmd)
+                .args(["uninstall", "-y", "seesea-core"])
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .status();
+            println!("命令执行状态: {status:?}");
+        }
         
-        // 卸载seesea包，忽略错误
-        info!("Uninstalling seesea package");
-        println!("执行命令: {pip_cmd} uninstall -y seesea");
-        let status = std::process::Command::new(pip_cmd)
-            .args(["uninstall", "-y", "seesea"])
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status();
-        println!("命令执行状态: {status:?}");
-        
-        // 卸载seesea-core包，忽略错误
-        info!("Uninstalling seesea-core package");
-        println!("执行命令: {pip_cmd} uninstall -y seesea-core");
-        let status = std::process::Command::new(pip_cmd)
-            .args(["uninstall", "-y", "seesea-core"])
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status();
-        println!("命令执行状态: {status:?}");
-        
-        // 5. 删除安装目录
+        // 7. 删除安装目录
         info!("Removing install directory: {install_dir:?}", install_dir = self.install_dir);
         if self.install_dir.exists() {
             // 先保存uninstaller路径，因为我们需要在删除目录前删除它
             let uninstaller_path = self.install_dir.join("uninstall.exe");
             
-            // 6. 删除卸载程序
+            // 8. 删除卸载程序
             info!("Removing uninstaller");
             self.platform.remove_uninstaller(&self.config)?;
             
-            // 7. 删除安装目录
+            // 9. 删除安装目录
             // 先删除uninstall.exe，因为它正在运行
             if uninstaller_path.exists() {
                 std::fs::remove_file(&uninstaller_path)?;
