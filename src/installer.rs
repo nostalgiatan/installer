@@ -858,7 +858,6 @@ impl Installer {
         
         if whl_files.is_empty() {
             warn!("No whl files found in install directory");
-            return Ok(());
         }
         
         // 根据平台执行不同的安装逻辑
@@ -886,6 +885,32 @@ impl Installer {
                 execute_command(format!("{} install {}", venv_pip.to_str().unwrap(), whl_file.to_str().unwrap()).as_str(), None)?;
             }
             
+            // 安装配置文件中定义的依赖
+            let mut has_playwright = false;
+            if let Some(dependencies) = &self.config.dependencies {
+                info!("Installing dependencies from config file");
+                for dep in dependencies {
+                    if dep.optional && dep.kind == "development" {
+                        continue;
+                    }
+                    
+                    info!("Installing dependency: {}=={}", dep.name, dep.version);
+                    execute_command(format!("{} install {}=={}", venv_pip.to_str().unwrap(), dep.name, dep.version).as_str(), None)?;
+                    
+                    // 检查是否安装了playwright
+                    if dep.name == "playwright" {
+                        has_playwright = true;
+                    }
+                }
+            }
+            
+            // 如果安装了playwright，安装浏览器
+            if has_playwright {
+                info!("Installing playwright browsers");
+                let venv_python = venv_dir.join("bin").join("python");
+                execute_command(format!("{} -m playwright install chromium", venv_python.to_str().unwrap()).as_str(), None)?;
+            }
+            
             // 创建bash脚本，导出seesea命令
             let bash_script_path = Path::new("/usr/local/bin/seesea");
             let bash_script_content = format!("#!/bin/bash\n\n{}/bin/seesea \"$@\"\n", venv_dir.to_str().unwrap());
@@ -900,18 +925,70 @@ impl Installer {
             // Windows平台：直接安装
             info!("Installing on Windows platform");
             
+            // 安装所有whl文件
             for whl_file in &whl_files {
                 info!("Installing whl file: {whl_file:?}");
                 execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+            // 安装配置文件中定义的依赖
+            let mut has_playwright = false;
+            if let Some(dependencies) = &self.config.dependencies {
+                info!("Installing dependencies from config file");
+                for dep in dependencies {
+                    if dep.optional && dep.kind == "development" {
+                        continue;
+                    }
+                    
+                    info!("Installing dependency: {}=={}", dep.name, dep.version);
+                    execute_command(format!("{} install {}=={}", pip_cmd, dep.name, dep.version).as_str(), None)?;
+                    
+                    // 检查是否安装了playwright
+                    if dep.name == "playwright" {
+                        has_playwright = true;
+                    }
+                }
+            }
+            
+            // 如果安装了playwright，安装浏览器
+            if has_playwright {
+                info!("Installing playwright browsers");
+                execute_command(format!("{} -m playwright install chromium", python_cmd).as_str(), None)?;
             }
             
         } else if cfg!(target_os = "macos") {
             // macOS平台：直接安装
             info!("Installing on macOS platform");
             
+            // 安装所有whl文件
             for whl_file in &whl_files {
                 info!("Installing whl file: {whl_file:?}");
                 execute_command(format!("{pip_cmd} install {}", whl_file.to_str().unwrap()).as_str(), None)?;
+            }
+            
+            // 安装配置文件中定义的依赖
+            let mut has_playwright = false;
+            if let Some(dependencies) = &self.config.dependencies {
+                info!("Installing dependencies from config file");
+                for dep in dependencies {
+                    if dep.optional && dep.kind == "development" {
+                        continue;
+                    }
+                    
+                    info!("Installing dependency: {}=={}", dep.name, dep.version);
+                    execute_command(format!("{} install {}=={}", pip_cmd, dep.name, dep.version).as_str(), None)?;
+                    
+                    // 检查是否安装了playwright
+                    if dep.name == "playwright" {
+                        has_playwright = true;
+                    }
+                }
+            }
+            
+            // 如果安装了playwright，安装浏览器
+            if has_playwright {
+                info!("Installing playwright browsers");
+                execute_command(format!("{} -m playwright install chromium", python_cmd).as_str(), None)?;
             }
         }
         
