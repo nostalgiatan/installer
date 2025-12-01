@@ -227,9 +227,9 @@ pub fn load_config(config_path: &str) -> Result<Config> {
     }
     
     // 添加系统安装目录的查找
-    paths_to_try.push("/opt/seesea/install.toml".to_string());
-    paths_to_try.push("C:\\Program Files\\SeeSea\\install.toml".to_string());
-    paths_to_try.push("/Applications/SeeSea/install.toml".to_string());
+    paths_to_try.push("/opt/seesea-installer/install.toml".to_string());
+    paths_to_try.push("C:\\Program Files\\SeeSea-Installer\\install.toml".to_string());
+    paths_to_try.push("/Applications/SeeSea-Installer/install.toml".to_string());
     
     let mut file = None;
     let mut used_path = String::new();

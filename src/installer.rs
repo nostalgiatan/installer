@@ -721,9 +721,14 @@ impl Installer {
         building_paths.push(PathBuf::from("../../building"));
         
         // 系统安装目录
-        building_paths.push(PathBuf::from("/opt/seesea/building"));
-        building_paths.push(PathBuf::from("C:\\Program Files\\SeeSea\\building"));
-        building_paths.push(PathBuf::from("/Applications/SeeSea\\building"));
+        building_paths.push(PathBuf::from("/opt/seesea-installer/building"));
+        building_paths.push(PathBuf::from("C:\\Program Files\\SeeSea-Installer\\building"));
+        building_paths.push(PathBuf::from("/Applications/SeeSea-Installer\\building"));
+        
+        // Linux deb包特定目录结构：building在lib/seesea-installer目录下
+        building_paths.push(exe_dir.join("../lib/seesea-installer/building"));
+        building_paths.push(PathBuf::from("/usr/lib/seesea-installer/building"));
+        building_paths.push(PathBuf::from("/lib/seesea-installer/building"));
         
         // 查找存在的building目录
         let mut found_building_dir = None;
