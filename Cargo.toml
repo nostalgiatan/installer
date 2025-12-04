@@ -1,6 +1,6 @@
 [package]
 name = "seesea-installer"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2024"
 description = "SeeSea Self-Contained Installer"
 license = "Apache-2.0"
@@ -43,7 +43,7 @@ path = "src/main.rs"
 [package.metadata.packager]
 name = "SeeSea Installer"
 description = "SeeSea Self-Contained Installer"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["SeeSea Team"]
 resources = ["../building", "../install.toml"]
 icons = ["../static/image/img.png"]
